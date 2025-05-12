@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Point Doubler Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #2c3e50; /* Dark blue-grey */
+            color: #ecf0f1; /* Light grey text */
+            overflow: hidden; /* Prevent scrollbars during animations */
+        }
+
+        .game-container {
+            background-color: #34495e; /* Slightly lighter blue-grey */
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #1abc9c; /* Turquoise */
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+
+        .points-display {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #f1c40f; /* Yellow */
+            margin: 20px 0;
+            transition: color 0.3s ease;
+        }
+
+        .points-display.win {
+            color: #2ecc71; /* Green */
+        }
+
+        .points-display.loss {
+            color: #e74c3c; /* Red */
+        }
+
+        .bet-controls input[type="number"] {
+            padding: 12px;
+            border: 2px solid #1abc9c;
+            border-radius: 8px;
+            margin-right: 10px;
+            font-size: 1em;
+            width: 120px;
+            background-color: #ecf0f1;
+            color: #2c3e50;
+        }
+
+        .bet-controls button {
+            padding: 12px 25px;
+            background-color: #1abc9c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+
+        .bet-controls button:hover {
+            background-color: #16a085; /* Darker turquoise */
+        }
+        .bet-controls button:active {
+            transform: scale(0.95);
+        }
+        .bet-controls button:disabled {
+            background-color: #7f8c8d; /* Greyed out */
+            cursor: not-allowed;
+        }
+
+
+        #message {
+            margin-top: 20px;
+            font-size: 1.1em;
+            min-height: 25px; /* Reserve space */
+            color: #e67e22; /* Orange for warnings */
+        }
+
+        #game-over-message {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .win-message { color: #2ecc71; }
+        .lose-message { color: #e74c3c; }
+
+        /* --- Coin Animation --- */
+        .coin-container {
+            margin: 30px auto;
+            width: 100px;
+            height: 100px;
+            perspective: 1000px; /* For 3D effect */
+        }
+
+        #coin {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s cubic-bezier(0.68, -0.55, 0.27, 1.55); /* Flip animation */
+        }
+
+        .coin-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; /* Hide the back of the face during flip */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8em;
+            font-weight: bold;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3) inset;
+        }
+
+        .front {
+            background: linear-gradient(45deg, #f1c40f, #e67e22); /* Gold gradient */
+            color: #fff;
+        }
+
+        .back {
+            background: linear-gradient(45deg, #bdc3c7, #95a5a6); /* Silver gradient */
+            color: #34495e;
+            transform: rotateY(180deg); /* Start flipped over */
+        }
+        
+        #coin.flipping {
+            transform: rotateY(1800deg); /* Multiple spins for effect */
+        }
+
+        /* Initial state for coin text before first flip */
+        #coin .front span, #coin .back span {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out 0.8s; /* Fade in after flip */
+        }
+        #coin.flipped .front span, #coin.flipped .back span {
+            opacity: 1;
+        }
+        
+        /* Confetti - very basic */
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            opacity: 0;
+            animation: fall 3s linear forwards;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 1;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>Point Doubler!</h1>
+        <p>GOAL: REACH <strong>10,000</strong> POINTS</p>
+
+        <p>YOUR POINTS:</p>
+        <div id="pointsDisplay" class="points-display">100</div>
+
+        <div class="coin-container">
+            <div id="coin">
+                <div class="coin-face front"><span>?</span></div>
+                <div class="coin-face back"><span>?</span></div>
+            </div>
+        </div>
+
+        <div class="bet-controls">
+            <input type="number" id="betAmount" placeholder="Enter bet" min="1">
+            <button id="betButton">Place Bet</button>
+        </div>
+
+        <p id="message"></p>
+        <div id="game-over-message"></div>
+        <button id="resetButton" style="display:none; margin-top: 20px;">Play Again</button>
+    </div>
+
+    <script>
+        const GOAL_POINTS = 10000;
+        const STARTING_POINTS = 100;
+        let currentPoints = STARTING_POINTS;
+
+        const pointsDisplay = document.getElementById('pointsDisplay');
+        const betAmountInput = document.getElementById('betAmount');
+        const betButton = document.getElementById('betButton');
+        const messageDisplay = document.getElementById('message');
+        const coin = document.getElementById('coin');
+        const coinFrontText = coin.querySelector('.front span');
+        const coinBackText = coin.querySelector('.back span');
+        const gameOverMessageDisplay = document.getElementById('game-over-message');
+        const resetButton = document.getElementById('resetButton');
+
+        function updateDisplay() {
+            pointsDisplay.textContent = currentPoints;
+            // Clear temporary win/loss class
+            pointsDisplay.classList.remove('win', 'loss');
+            // Set max bet to current points
+            betAmountInput.max = currentPoints;
+        }
+
+        function showMessage(msg, isError = false) {
+            messageDisplay.textContent = msg;
+            messageDisplay.style.color = isError ? '#e74c3c' : '#e67e22'; // Red for error, orange for info
+        }
+        
+        function triggerConfetti() {
+            for (let i = 0; i < 50; i++) { // Number of confetti pieces
+                const confettiPiece = document.createElement('div');
+                confettiPiece.classList.add('confetti');
+                confettiPiece.style.left = Math.random() * 100 + 'vw';
+                confettiPiece.style.top = -Math.random() * 100 + 'vh'; // Start above screen
+                confettiPiece.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                confettiPiece.style.animationDelay = Math.random() * 2 + 's';
+                confettiPiece.style.width = (Math.random() * 5 + 5) + 'px'; // Random size
+                confettiPiece.style.height = confettiPiece.style.width;
+                if (Math.random() > 0.5) confettiPiece.style.borderRadius = '50%'; // Some are circles
+                document.body.appendChild(confettiPiece);
+
+                // Clean up confetti after animation
+                confettiPiece.addEventListener('animationend', () => {
+                    confettiPiece.remove();
+                });
+            }
+        }
+
+
+        function handleBet() {
+            const bet = parseInt(betAmountInput.value);
+
+            if (isNaN(bet) || bet <= 0) {
+                showMessage("Please enter a valid positive bet amount.", true);
+                return;
+            }
+            if (bet > currentPoints) {
+                showMessage("You cannot bet more points than you have.", true);
+                return;
+            }
+
+            showMessage(""); // Clear previous message
+            betButton.disabled = true;
+            betAmountInput.disabled = true;
+            coinFrontText.textContent = '?'; // Reset coin text
+            coinBackText.textContent = '?';
+            coin.classList.remove('flipped'); // Reset flipped state for text fade-in
+
+            // Start flip animation
+            coin.classList.add('flipping');
+
+            // Simulate game logic after animation
+            setTimeout(() => {
+                const win = Math.random() < 0.5; // 50% chance to win
+
+                if (win) {
+                    currentPoints += bet;
+                    showMessage(`YOU WON ${bet} POINTS!`, false);
+                    pointsDisplay.classList.add('win');
+                    coinFrontText.textContent = 'WIN!';
+                    coinBackText.textContent = 'WIN!'; // Both sides show result for clarity after flip
+                } else {
+                    currentPoints -= bet;
+                    showMessage(`YOU LOST ${bet} POINTS.`, true);
+                    pointsDisplay.classList.add('loss');
+                    coinFrontText.textContent = 'LOSE';
+                    coinBackText.textContent = 'LOSE';
+                }
+                
+                coin.classList.remove('flipping');
+                coin.classList.add('flipped'); // Add class to trigger text fade-in
+                updateDisplay();
+                checkGameOver();
+
+                if (currentPoints > 0 && currentPoints < GOAL_POINTS) {
+                    betButton.disabled = false;
+                    betAmountInput.disabled = false;
+                    betAmountInput.value = ''; // Clear input
+                    betAmountInput.focus();
+                }
+            }, 1200); // Match CSS transition duration + a small buffer for text update
+        }
+
+        function checkGameOver() {
+            if (currentPoints >= GOAL_POINTS) {
+                gameOverMessageDisplay.textContent = "🎉 CONGRATULATIONS! YOU REACHED THE GOAL! 🎉";
+                gameOverMessageDisplay.className = 'win-message';
+                betButton.disabled = true;
+                betAmountInput.disabled = true;
+                resetButton.style.display = 'inline-block';
+                triggerConfetti();
+            } else if (currentPoints <= 0) {
+                currentPoints = 0; // Ensure it doesn't go negative on display
+                updateDisplay();
+                gameOverMessageDisplay.textContent = "😭 GAME OVER! YOU LOST ALL YOUR POINTS. 😭";
+                gameOverMessageDisplay.className = 'lose-message';
+                betButton.disabled = true;
+                betAmountInput.disabled = true;
+                resetButton.style.display = 'inline-block';
+            }
+        }
+
+        function resetGame() {
+            currentPoints = STARTING_POINTS;
+            updateDisplay();
+            showMessage("");
+            gameOverMessageDisplay.textContent = "";
+            gameOverMessageDisplay.className = '';
+            betButton.disabled = false;
+            betAmountInput.disabled = false;
+            betAmountInput.value = '';
+            resetButton.style.display = 'none';
+            coinFrontText.textContent = '?';
+            coinBackText.textContent = '?';
+            coin.classList.remove('flipped');
+            // Remove any leftover confetti
+            document.querySelectorAll('.confetti').forEach(c => c.remove());
+        }
+
+        betButton.addEventListener('click', handleBet);
+        resetButton.addEventListener('click', resetGame);
+        betAmountInput.addEventListener('keypress', function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault(); // Prevent form submission if it were in a form
+                betButton.click();
+            }
+        });
+
+        // Initialize
+        updateDisplay();
+        coinFrontText.textContent = 'BET'; // Initial text on coin
+        coinBackText.textContent = 'NOW';
+        coin.classList.add('flipped'); // Show initial text immediately
+    </script>
+
+</body>
+</html>
