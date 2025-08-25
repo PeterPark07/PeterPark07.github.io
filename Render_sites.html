@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Internet</title>
+</head>
+<body>
+
+    <h1>My Internet</h1>
+    
+    <ol id="siteList"></ol>
+
+    <script>
+        // Function to fetch and parse the content of sites.txt
+        function fetchSites() {
+            var siteList = document.getElementById("siteList");
+
+            fetch('sites.txt')
+                .then(response => response.text())
+                .then(data => {
+                    var siteNames = data.split('\n').filter(Boolean);
+
+                    siteNames.forEach(function (siteName, index) {
+                        var siteUrl = 'https://' + siteName.trim() + '.onrender.com';
+                        var listItem = document.createElement("li");
+                        var link = document.createElement("a");
+                        link.href = siteUrl;
+                        link.textContent = siteName.trim();
+                        listItem.appendChild(link);
+                        siteList.appendChild(listItem);
+                    });
+                })
+                .catch(error => console.error('Error fetching sites.txt:', error));
+        }
+
+        // Call the function to fetch sites once the page is loaded
+        window.onload = fetchSites;
+    </script>
+
+</body>
+</html>
